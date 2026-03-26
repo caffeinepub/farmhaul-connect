@@ -11,6 +11,7 @@ import {
   Leaf,
   Loader2,
   LogOut,
+  MapPin,
   MessageCircle,
   Phone,
   Plus,
@@ -23,6 +24,7 @@ import { RequestStatus } from "../backend.d";
 import CallManager from "../components/CallManager";
 import FarmerVoiceAssistant from "../components/FarmerVoiceAssistant";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import LiveLocationModal from "../components/LiveLocationModal";
 import MessagingPanel from "../components/MessagingPanel";
 import RequestCard from "../components/RequestCard";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -47,6 +49,7 @@ export default function FarmerDashboard({ profile }: { profile: UserProfile }) {
   } | null>(null);
   const [callPickerRequest, setCallPickerRequest] =
     useState<PickupRequest | null>(null);
+  const [showLiveLocation, setShowLiveLocation] = useState(false);
 
   const [form, setForm] = useState({
     cropType: "",
@@ -66,6 +69,13 @@ export default function FarmerDashboard({ profile }: { profile: UserProfile }) {
   );
   const historyRequests = (requests ?? []).filter((r) =>
     [RequestStatus.delivered, RequestStatus.cancelled].includes(r.status),
+  );
+
+  const hasActiveTransporter = activeRequests.some(
+    (r) =>
+      r.transporterId &&
+      (r.status === RequestStatus.accepted ||
+        r.status === RequestStatus.inProgress),
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,6 +137,26 @@ export default function FarmerDashboard({ profile }: { profile: UserProfile }) {
                 {t("badge.farmer")}
               </span>
             </div>
+
+            {/* Live Location Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowLiveLocation(true)}
+              className="relative text-muted-foreground hover:text-brand-green hover:bg-brand-green/10 gap-1.5"
+              data-ocid="live_location.open_modal_button"
+            >
+              <span className="relative flex items-center">
+                <MapPin className="w-4 h-4" />
+                {hasActiveTransporter && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-brand-green animate-pulse" />
+                )}
+              </span>
+              <span className="hidden sm:inline text-xs font-medium">
+                Live Location
+              </span>
+            </Button>
+
             <LanguageSwitcher />
             <Button
               variant="ghost"
@@ -414,6 +444,12 @@ export default function FarmerDashboard({ profile }: { profile: UserProfile }) {
           caffeine.ai
         </a>
       </footer>
+
+      <LiveLocationModal
+        open={showLiveLocation}
+        onClose={() => setShowLiveLocation(false)}
+        activeRequests={activeRequests}
+      />
 
       {messagingRequest && (
         <MessagingPanel
