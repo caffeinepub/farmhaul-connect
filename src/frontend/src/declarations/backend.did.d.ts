@@ -34,6 +34,10 @@ export interface PickupRequest {
   'farmerName' : string,
   'pickupLocation' : string,
 }
+export interface VehicleInfo {
+  'vehicleType' : string,
+  'vehicleCapacity' : string,
+}
 export type RequestStatus = { 'cancelled' : null } |
   { 'pending' : null } |
   { 'delivered' : null } |
@@ -61,6 +65,7 @@ export interface _SERVICE {
   'getAvailableRequests' : ActorMethod<[], Array<PickupRequest>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getCallerVehicleInfo' : ActorMethod<[], [] | [VehicleInfo]>,
   'getMessagesByRequest' : ActorMethod<[bigint], Array<Message>>,
   'getMyRequests' : ActorMethod<[], Array<PickupRequest>>,
   'getMyTrips' : ActorMethod<[], Array<PickupRequest>>,
@@ -69,6 +74,7 @@ export interface _SERVICE {
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'register' : ActorMethod<[string, string, UserRole], UserProfile>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'saveVehicleInfo' : ActorMethod<[string, string], undefined>,
   'sendMessage' : ActorMethod<[bigint, string], undefined>,
   'startDelivery' : ActorMethod<[bigint], undefined>,
 }

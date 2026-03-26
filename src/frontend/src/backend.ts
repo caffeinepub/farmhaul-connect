@@ -113,6 +113,10 @@ export interface Message {
     timestamp: bigint;
     fromName: string;
 }
+export interface VehicleInfo {
+    vehicleType: string;
+    vehicleCapacity: string;
+}
 export interface UserProfile {
     userRole: UserRole;
     name: string;
@@ -151,8 +155,10 @@ export interface backendInterface {
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     sendMessage(requestId: bigint, text: string): Promise<void>;
     startDelivery(requestId: bigint): Promise<void>;
+    getCallerVehicleInfo(): Promise<VehicleInfo | null>;
+    saveVehicleInfo(vehicleType: string, vehicleCapacity: string): Promise<void>;
 }
-import type { PickupRequest as _PickupRequest, RequestStatus as _RequestStatus, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
+import type { PickupRequest as _PickupRequest, RequestStatus as _RequestStatus, UserProfile as _UserProfile, UserRole as _UserRole, VehicleInfo as _VehicleInfo } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _initializeAccessControlWithSecret(arg0: string): Promise<void> {
@@ -432,6 +438,34 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.startDelivery(arg0);
+            return result;
+        }
+    }
+    async getCallerVehicleInfo(): Promise<VehicleInfo | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getCallerVehicleInfo();
+                return result.length === 0 ? null : { vehicleType: result[0].vehicleType, vehicleCapacity: result[0].vehicleCapacity };
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getCallerVehicleInfo();
+            return result.length === 0 ? null : { vehicleType: result[0].vehicleType, vehicleCapacity: result[0].vehicleCapacity };
+        }
+    }
+    async saveVehicleInfo(arg0: string, arg1: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.saveVehicleInfo(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.saveVehicleInfo(arg0, arg1);
             return result;
         }
     }

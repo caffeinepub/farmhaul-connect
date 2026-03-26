@@ -199,7 +199,7 @@ export function useVehicleInfo() {
     queryKey: ["vehicleInfo"],
     queryFn: async () => {
       if (!actor) return null;
-      return (actor as any).getCallerVehicleInfo();
+      return actor.getCallerVehicleInfo();
     },
     enabled: !!actor && !isFetching,
   });
@@ -214,7 +214,7 @@ export function useSaveVehicleInfo() {
       vehicleCapacity,
     }: { vehicleType: string; vehicleCapacity: string }) => {
       if (!actor) throw new Error("Not connected");
-      return (actor as any).saveVehicleInfo(vehicleType, vehicleCapacity);
+      return actor.saveVehicleInfo(vehicleType, vehicleCapacity);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vehicleInfo"] });
