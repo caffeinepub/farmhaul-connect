@@ -1,0 +1,75 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "GeneralSans";
+  src: url("/assets/fonts/GeneralSans.woff2") format("woff2");
+  font-weight: 200 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PlusJakartaSans";
+  src: url("/assets/fonts/PlusJakartaSans.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+
+    /* FarmHaul palette — OKLCH */
+    /* Primary green #66B73F */
+    --brand-green: 0.66 0.18 128;
+    /* Dark forest #0F3B2E */
+    --brand-dark: 0.24 0.055 162;
+    /* Mid forest #144735 */
+    --brand-dark-mid: 0.28 0.065 162;
+
+    --background: 1 0 0;
+    --foreground: 0.22 0.012 253;
+    --card: 1 0 0;
+    --card-foreground: 0.22 0.012 253;
+    --popover: 1 0 0;
+    --popover-foreground: 0.22 0.012 253;
+    --primary: 0.66 0.18 128;
+    --primary-foreground: 1 0 0;
+    --secondary: 0.24 0.055 162;
+    --secondary-foreground: 1 0 0;
+    --muted: 0.96 0 0;
+    --muted-foreground: 0.52 0.01 253;
+    --accent: 0.94 0.04 128;
+    --accent-foreground: 0.24 0.055 162;
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 0.985 0 0;
+    --border: 0.9 0 0;
+    --input: 0.9 0 0;
+    --ring: 0.66 0.18 128;
+    --chart-1: 0.66 0.18 128;
+    --chart-2: 0.6 0.118 184.704;
+    --chart-3: 0.398 0.07 227.392;
+    --chart-4: 0.828 0.189 84.429;
+    --chart-5: 0.769 0.188 70.08;
+    --sidebar: 0.985 0 0;
+    --sidebar-foreground: 0.22 0.012 253;
+    --sidebar-primary: 0.66 0.18 128;
+    --sidebar-primary-foreground: 1 0 0;
+    --sidebar-accent: 0.96 0 0;
+    --sidebar-accent-foreground: 0.22 0.012 253;
+    --sidebar-border: 0.9 0 0;
+    --sidebar-ring: 0.66 0.18 128;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "GeneralSans", "PlusJakartaSans", system-ui, sans-serif;
+  }
+}
