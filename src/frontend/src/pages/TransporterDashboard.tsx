@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -8,13 +10,16 @@ import {
   LogOut,
   MessageCircle,
   Package,
+  Phone,
   Search,
   Truck,
+  User,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { PickupRequest, UserProfile } from "../backend.d";
 import { RequestStatus } from "../backend.d";
+import CallManager from "../components/CallManager";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import MessagingPanel from "../components/MessagingPanel";
 import RequestCard from "../components/RequestCard";
@@ -25,7 +30,9 @@ import {
   useAvailableRequests,
   useCompleteDelivery,
   useMyTrips,
+  useSaveVehicleInfo,
   useStartDelivery,
+  useVehicleInfo,
 } from "../hooks/useQueries";
 
 export default function TransporterDashboard({
@@ -35,12 +42,28 @@ export default function TransporterDashboard({
   const { data: available, isLoading: loadingAvailable } =
     useAvailableRequests();
   const { data: trips, isLoading: loadingTrips } = useMyTrips();
+  const { data: vehicleInfo } = useVehicleInfo();
   const acceptRequest = useAcceptRequest();
   const startDelivery = useStartDelivery();
   const completeDelivery = useCompleteDelivery();
+  const saveVehicleInfo = useSaveVehicleInfo();
   const { t } = useLanguage();
   const [messagingRequest, setMessagingRequest] =
     useState<PickupRequest | null>(null);
+  const [callingRequest, setCallingRequest] = useState<{
+    request: PickupRequest;
+    type: "audio" | "video";
+  } | null>(null);
+  const [callPickerRequest, setCallPickerRequest] =
+    useState<PickupRequest | null>(null);
+
+  const [vehicleType, setVehicleType] = useState("");
+  const [vehicleCapacity, setVehicleCapacity] = useState("");
+
+  useEffect(() => {
+    setVehicleType(vehicleInfo?.vehicleType ?? "");
+    setVehicleCapacity(vehicleInfo?.vehicleCapacity ?? "");
+  }, [vehicleInfo]);
 
   const activeTrips = (trips ?? []).filter((r) =>
     [RequestStatus.accepted, RequestStatus.inProgress].includes(r.status),
@@ -76,9 +99,17 @@ export default function TransporterDashboard({
     }
   };
 
+  const handleSaveVehicle = async () => {
+    try {
+      await saveVehicleInfo.mutateAsync({ vehicleType, vehicleCapacity });
+      toast.success("Vehicle info saved!");
+    } catch {
+      toast.error("Failed to save vehicle info.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-muted flex flex-col">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-border shadow-xs">
         <div className="container max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -120,7 +151,7 @@ export default function TransporterDashboard({
 
         <Tabs defaultValue="available" className="w-full">
           <TabsList
-            className="mb-6 bg-white border border-border rounded-xl p-1"
+            className="mb-6 bg-white border border-border rounded-xl p-1 flex-wrap h-auto gap-1"
             data-ocid="transporter.tabs.tab"
           >
             <TabsTrigger
@@ -140,6 +171,13 @@ export default function TransporterDashboard({
               className="rounded-lg gap-2 data-[state=active]:bg-brand-green data-[state=active]:text-white"
             >
               <History className="w-4 h-4" /> {t("transporter.tab.history")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="profile"
+              className="rounded-lg gap-2 data-[state=active]:bg-brand-green data-[state=active]:text-white"
+              data-ocid="profile.tab"
+            >
+              <User className="w-4 h-4" /> Profile
             </TabsTrigger>
           </TabsList>
 
@@ -232,6 +270,16 @@ export default function TransporterDashboard({
                           <MessageCircle className="w-3.5 h-3.5" />
                           Message
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-pill border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white gap-1.5"
+                          onClick={() => setCallPickerRequest(req)}
+                          data-ocid={`trips.secondary_button.${i + 1}`}
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                          Call
+                        </Button>
                         {req.status === RequestStatus.accepted && (
                           <Button
                             size="sm"
@@ -253,7 +301,7 @@ export default function TransporterDashboard({
                             className="rounded-pill bg-brand-green text-white hover:opacity-90"
                             onClick={() => handleComplete(req.id)}
                             disabled={completeDelivery.isPending}
-                            data-ocid={`trips.secondary_button.${i + 1}`}
+                            data-ocid={`trips.primary_button.${i + 1}`}
                           >
                             {completeDelivery.isPending ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -303,6 +351,63 @@ export default function TransporterDashboard({
               </div>
             )}
           </TabsContent>
+
+          {/* Profile */}
+          <TabsContent value="profile">
+            <div
+              className="bg-white rounded-2xl shadow-card p-6 max-w-md"
+              data-ocid="profile.card"
+            >
+              <h2 className="text-lg font-bold text-brand-dark mb-5">
+                My Profile
+              </h2>
+              <div className="space-y-5">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Name</Label>
+                  <p className="font-medium text-brand-dark">{profile.name}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Phone</Label>
+                  <p className="font-medium text-brand-dark">{profile.phone}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vehicleType">Vehicle Type</Label>
+                  <Input
+                    id="vehicleType"
+                    placeholder="e.g. Truck, Van, Tractor"
+                    value={vehicleType}
+                    onChange={(e) => setVehicleType(e.target.value)}
+                    data-ocid="profile.input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vehicleCapacity">Vehicle Capacity</Label>
+                  <Input
+                    id="vehicleCapacity"
+                    placeholder="e.g. 5 tons, 2000 kg"
+                    value={vehicleCapacity}
+                    onChange={(e) => setVehicleCapacity(e.target.value)}
+                    data-ocid="profile.search_input"
+                  />
+                </div>
+                <Button
+                  className="w-full rounded-pill bg-brand-green text-white hover:opacity-90"
+                  onClick={handleSaveVehicle}
+                  disabled={saveVehicleInfo.isPending}
+                  data-ocid="profile.save_button"
+                >
+                  {saveVehicleInfo.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Vehicle Info"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -325,6 +430,75 @@ export default function TransporterDashboard({
           request={messagingRequest}
           currentUserPrincipal={identity?.getPrincipal().toString() ?? ""}
           currentUserName={profile.name}
+        />
+      )}
+
+      {/* Call type picker */}
+      {callPickerRequest && !callingRequest && (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary
+        <div
+          className="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center"
+          onClick={() => setCallPickerRequest(null)}
+          data-ocid="call.dialog"
+        >
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: inner stop-propagation */}
+          <div
+            className="bg-white rounded-2xl p-6 shadow-xl w-72 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-brand-dark text-center">
+              Start a Call
+            </h3>
+            <p className="text-sm text-muted-foreground text-center">
+              with {callPickerRequest.farmerName ?? "Farmer"}
+            </p>
+            <Button
+              className="rounded-pill bg-brand-green text-white gap-2"
+              onClick={() => {
+                setCallingRequest({
+                  request: callPickerRequest,
+                  type: "audio",
+                });
+                setCallPickerRequest(null);
+              }}
+              data-ocid="call.primary_button"
+            >
+              <Phone className="w-4 h-4" /> Audio Call
+            </Button>
+            <Button
+              variant="outline"
+              className="rounded-pill border-brand-green text-brand-green gap-2"
+              onClick={() => {
+                setCallingRequest({
+                  request: callPickerRequest,
+                  type: "video",
+                });
+                setCallPickerRequest(null);
+              }}
+              data-ocid="call.secondary_button"
+            >
+              <Phone className="w-4 h-4" /> Video Call
+            </Button>
+            <Button
+              variant="ghost"
+              className="rounded-pill text-muted-foreground"
+              onClick={() => setCallPickerRequest(null)}
+              data-ocid="call.cancel_button"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {callingRequest && (
+        <CallManager
+          open={!!callingRequest}
+          onClose={() => setCallingRequest(null)}
+          request={callingRequest.request}
+          currentUserPrincipal={identity?.getPrincipal().toString() ?? ""}
+          isInitiator={true}
+          callType={callingRequest.type}
         />
       )}
     </div>

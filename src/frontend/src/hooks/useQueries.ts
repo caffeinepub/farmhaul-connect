@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Message, UserRole } from "../backend.d";
-import type { PickupRequest, UserProfile } from "../backend.d";
+import type { Message, UserProfile, UserRole, VehicleInfo } from "../backend.d";
+import type { PickupRequest } from "../backend.d";
 import { useActor } from "./useActor";
 
 export function useUserProfile() {
@@ -189,6 +189,35 @@ export function useSendMessage() {
       queryClient.invalidateQueries({
         queryKey: ["messages", requestId.toString()],
       });
+    },
+  });
+}
+
+export function useVehicleInfo() {
+  const { actor, isFetching } = useActor();
+  return useQuery<VehicleInfo | null>({
+    queryKey: ["vehicleInfo"],
+    queryFn: async () => {
+      if (!actor) return null;
+      return (actor as any).getCallerVehicleInfo();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useSaveVehicleInfo() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      vehicleType,
+      vehicleCapacity,
+    }: { vehicleType: string; vehicleCapacity: string }) => {
+      if (!actor) throw new Error("Not connected");
+      return (actor as any).saveVehicleInfo(vehicleType, vehicleCapacity);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vehicleInfo"] });
     },
   });
 }

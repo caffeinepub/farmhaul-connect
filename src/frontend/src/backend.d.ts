@@ -31,6 +31,18 @@ export interface Message {
     timestamp: bigint;
     fromName: string;
 }
+export interface CallSignal {
+    id: bigint;
+    requestId: bigint;
+    fromPrincipal: Principal;
+    signalType: string;
+    payload: string;
+    timestamp: bigint;
+}
+export interface VehicleInfo {
+    vehicleType: string;
+    vehicleCapacity: string;
+}
 export interface UserProfile {
     userRole: UserRole;
     name: string;
@@ -58,6 +70,8 @@ export interface backendInterface {
     getAvailableRequests(): Promise<Array<PickupRequest>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getCallerVehicleInfo(): Promise<VehicleInfo | null>;
+    getCallSignals(requestId: bigint, afterId: bigint): Promise<Array<CallSignal>>;
     getMessagesByRequest(requestId: bigint): Promise<Array<Message>>;
     getMyRequests(): Promise<Array<PickupRequest>>;
     getMyTrips(): Promise<Array<PickupRequest>>;
@@ -66,6 +80,8 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     register(name: string, phone: string, role: UserRole): Promise<UserProfile>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    saveVehicleInfo(vehicleType: string, vehicleCapacity: string): Promise<void>;
+    sendCallSignal(requestId: bigint, signalType: string, payload: string): Promise<bigint>;
     sendMessage(requestId: bigint, text: string): Promise<void>;
     startDelivery(requestId: bigint): Promise<void>;
 }

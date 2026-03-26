@@ -9,13 +9,11 @@ import Runtime "mo:core/Runtime";
 import Iter "mo:core/Iter";
 import Int "mo:core/Int";
 import Array "mo:core/Array";
-import Migration "migration";
+
 
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 
-// Apply migration using with-clauses
-(with migration = Migration.run)
 actor {
   // Types
   type UserRole = AccessControl.UserRole;
@@ -24,6 +22,11 @@ actor {
     name : Text;
     phone : Text;
     userRole : UserRole;
+  };
+
+  type VehicleInfo = {
+    vehicleType : Text;
+    vehicleCapacity : Text;
   };
 
   type RequestStatus = {
@@ -60,6 +63,15 @@ actor {
     timestamp : Int;
   };
 
+  type CallSignal = {
+    id : Nat;
+    requestId : Nat;
+    fromPrincipal : Principal;
+    signalType : Text;
+    payload : Text;
+    timestamp : Int;
+  };
+
   module PickupRequest {
     public func compare(req1 : PickupRequest, req2 : PickupRequest) : Order.Order {
       Nat.compare(req1.id, req2.id);
@@ -78,16 +90,25 @@ actor {
     };
   };
 
+  module CallSignal {
+    public func compare(s1 : CallSignal, s2 : CallSignal) : Order.Order {
+      Nat.compare(s1.id, s2.id);
+    };
+  };
+
   // State
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
   let userProfiles = Map.empty<Principal, UserProfile>();
+  let vehicleInfos = Map.empty<Principal, VehicleInfo>();
   let pickupRequests = Map.empty<Nat, PickupRequest>();
   let messages = Map.empty<Nat, Message>();
+  let callSignals = Map.empty<Nat, CallSignal>();
 
   var nextRequestId = 1;
   var nextMessageId = 1;
+  var nextSignalId = 1;
 
   // Profile management
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
@@ -102,6 +123,22 @@ actor {
       case (null) { Runtime.trap("User not found") };
       case (?profile) { ?profile };
     };
+  };
+
+  // Vehicle info management
+  public query ({ caller }) func getCallerVehicleInfo() : async ?VehicleInfo {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized");
+    };
+    vehicleInfos.get(caller);
+  };
+
+  public shared ({ caller }) func saveVehicleInfo(vehicleType : Text, vehicleCapacity : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized");
+    };
+    let info : VehicleInfo = { vehicleType; vehicleCapacity };
+    vehicleInfos.add(caller, info);
   };
 
   // Pickup requests
@@ -309,7 +346,7 @@ actor {
     pickupRequests.values().toArray().sort();
   };
 
-  // Custom registration with phone number
+  // Registration
   public shared ({ caller }) func register(name : Text, phone : Text, role : UserRole) : async UserProfile {
     if (role == #admin and not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("You are not authorized to register as admin");
@@ -392,5 +429,69 @@ actor {
     };
 
     messages.values().toArray().filter(func(m) { m.requestId == requestId }).sort();
+  };
+
+  // WebRTC Signaling
+  public shared ({ caller }) func sendCallSignal(requestId : Nat, signalType : Text, payload : Text) : async Nat {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized");
+    };
+
+    let request = switch (pickupRequests.get(requestId)) {
+      case (null) { Runtime.trap("Request not found") };
+      case (?req) { req };
+    };
+
+    let isFarmer = request.farmerId == caller;
+    let isTransporter = switch (request.transporterId) {
+      case (null) { false };
+      case (?id) { id == caller };
+    };
+
+    if (not (isFarmer or isTransporter)) {
+      Runtime.trap("Unauthorized: Only involved parties can call");
+    };
+
+    let id = nextSignalId;
+    nextSignalId += 1;
+
+    let signal : CallSignal = {
+      id;
+      requestId;
+      fromPrincipal = caller;
+      signalType;
+      payload;
+      timestamp = Time.now();
+    };
+
+    callSignals.add(id, signal);
+    id;
+  };
+
+  public query ({ caller }) func getCallSignals(requestId : Nat, afterId : Nat) : async [CallSignal] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized");
+    };
+
+    let request = switch (pickupRequests.get(requestId)) {
+      case (null) { Runtime.trap("Request not found") };
+      case (?req) { req };
+    };
+
+    let isFarmer = request.farmerId == caller;
+    let isTransporter = switch (request.transporterId) {
+      case (null) { false };
+      case (?id) { id == caller };
+    };
+
+    if (not (isFarmer or isTransporter)) {
+      Runtime.trap("Unauthorized");
+    };
+
+    callSignals.values().toArray()
+      .filter(func(s) {
+        s.requestId == requestId and s.id > afterId and s.fromPrincipal != caller
+      })
+      .sort();
   };
 };
