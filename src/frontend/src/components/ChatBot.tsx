@@ -1,7 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bot, MessageCircle, Mic, Send, Volume2, X } from "lucide-react";
+import {
+  Bot,
+  ImagePlus,
+  MessageCircle,
+  Mic,
+  Send,
+  Volume2,
+  X,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
@@ -9,6 +17,7 @@ interface Message {
   id: string;
   role: "user" | "bot";
   text: string;
+  image?: string; // base64 data URL
   timestamp: Date;
 }
 
@@ -22,7 +31,46 @@ function speakText(text: string) {
   window.speechSynthesis.speak(utterance);
 }
 
-async function askAI(userMessage: string): Promise<string> {
+async function askAI(
+  userMessage: string,
+  imageBase64?: string,
+): Promise<string> {
+  if (imageBase64) {
+    // Use pollinations vision endpoint with image
+    const body = {
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PREFIX,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: imageBase64 },
+            },
+            {
+              type: "text",
+              text:
+                userMessage ||
+                "Please describe this image and provide relevant farming advice.",
+            },
+          ],
+        },
+      ],
+      model: "openai",
+    };
+    const res = await fetch("https://text.pollinations.ai/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error("AI request failed");
+    const text = await res.text();
+    return text.trim();
+  }
+
   const prompt = SYSTEM_PREFIX + userMessage;
   const res = await fetch(
     `https://text.pollinations.ai/${encodeURIComponent(prompt)}`,
@@ -38,7 +86,7 @@ export default function ChatBot() {
     {
       id: "welcome",
       role: "bot",
-      text: "Hello! I'm your FarmHaul Assistant. Ask me anything about farming, crop transport, or how to use FarmHaul Connect!",
+      text: "Hello! I'm your FarmHaul Assistant. Ask me anything about farming, crop transport, or how to use FarmHaul Connect! You can also send images for advice.",
       timestamp: new Date(),
     },
   ]);
@@ -46,10 +94,13 @@ export default function ChatBot() {
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [voiceError, setVoiceError] = useState("");
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [pendingImageName, setPendingImageName] = useState("");
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesLen = messages.length;
 
   useEffect(() => {
@@ -66,22 +117,49 @@ export default function ChatBot() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messagesLen, isLoading]);
 
-  const sendMessage = async (text: string) => {
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setVoiceError("Please select a valid image file.");
+      setTimeout(() => setVoiceError(""), 3000);
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setVoiceError("Image must be smaller than 5MB.");
+      setTimeout(() => setVoiceError(""), 3000);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setPendingImage(ev.target?.result as string);
+      setPendingImageName(file.name);
+    };
+    reader.readAsDataURL(file);
+    // reset so same file can be re-selected
+    e.target.value = "";
+  };
+
+  const sendMessage = async (text: string, imageData?: string) => {
     const trimmed = text.trim();
-    if (!trimmed || isLoading) return;
+    if (!trimmed && !imageData) return;
+    if (isLoading) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
       role: "user",
-      text: trimmed,
+      text: trimmed || (imageData ? "[Image]" : ""),
+      image: imageData,
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    setPendingImage(null);
+    setPendingImageName("");
     setIsLoading(true);
 
     try {
-      const reply = await askAI(trimmed);
+      const reply = await askAI(trimmed, imageData);
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "bot",
@@ -104,7 +182,7 @@ export default function ChatBot() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    sendMessage(input);
+    sendMessage(input, pendingImage ?? undefined);
   };
 
   const toggleListening = () => {
@@ -132,7 +210,7 @@ export default function ChatBot() {
       const transcript = event.results[0][0].transcript;
       setInput(transcript);
       setIsListening(false);
-      sendMessage(transcript);
+      sendMessage(transcript, pendingImage ?? undefined);
     };
 
     recognition.onerror = () => {
@@ -150,6 +228,15 @@ export default function ChatBot() {
 
   return (
     <>
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImageSelect}
+      />
+
       {/* Floating Action Button */}
       <motion.button
         type="button"
@@ -191,7 +278,7 @@ export default function ChatBot() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.95 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="fixed bottom-24 right-4 z-50 w-[calc(100vw-2rem)] sm:w-[380px] h-[480px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-border"
+            className="fixed bottom-24 right-4 z-50 w-[calc(100vw-2rem)] sm:w-[380px] h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-border"
           >
             {/* Header */}
             <div className="flex items-center gap-2 px-4 py-3 bg-brand-green text-white flex-shrink-0">
@@ -234,7 +321,14 @@ export default function ChatBot() {
                           : "bg-muted text-foreground rounded-bl-sm"
                       }`}
                     >
-                      <p>{msg.text}</p>
+                      {msg.image && (
+                        <img
+                          src={msg.image}
+                          alt="Uploaded"
+                          className="rounded-lg mb-2 max-w-full max-h-40 object-cover"
+                        />
+                      )}
+                      {msg.text && msg.text !== "[Image]" && <p>{msg.text}</p>}
                       {msg.role === "bot" && (
                         <button
                           type="button"
@@ -272,17 +366,62 @@ export default function ChatBot() {
               </div>
             </ScrollArea>
 
+            {/* Image preview */}
+            {pendingImage && (
+              <div className="px-3 pb-2 flex-shrink-0">
+                <div className="relative inline-block">
+                  <img
+                    src={pendingImage}
+                    alt={pendingImageName}
+                    className="h-16 w-auto rounded-lg border border-border object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingImage(null);
+                      setPendingImageName("");
+                    }}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center shadow"
+                    aria-label="Remove image"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                  <p className="text-xs text-muted-foreground mt-1 truncate max-w-[120px]">
+                    {pendingImageName}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Input row */}
             <form
               onSubmit={handleSubmit}
               className="flex items-center gap-2 px-3 py-3 border-t border-border flex-shrink-0 bg-white"
             >
+              <button
+                type="button"
+                data-ocid="chatbot.image_upload"
+                onClick={() => fileInputRef.current?.click()}
+                className={`w-9 h-9 flex items-center justify-center rounded-full transition-all flex-shrink-0 ${
+                  pendingImage
+                    ? "bg-brand-green text-white"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+                aria-label="Attach image"
+                title="Attach image"
+              >
+                <ImagePlus className="w-4 h-4" />
+              </button>
               <Input
                 ref={inputRef}
                 data-ocid="chatbot.input"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask a farming question..."
+                placeholder={
+                  pendingImage
+                    ? "Add a message or send image..."
+                    : "Ask a farming question..."
+                }
                 className="flex-1 text-sm h-9"
                 disabled={isLoading}
               />
@@ -304,7 +443,7 @@ export default function ChatBot() {
                 data-ocid="chatbot.submit_button"
                 size="icon"
                 className="w-9 h-9 bg-brand-green hover:bg-brand-green/90 flex-shrink-0"
-                disabled={isLoading || !input.trim()}
+                disabled={isLoading || (!input.trim() && !pendingImage)}
               >
                 <Send className="w-4 h-4" />
               </Button>

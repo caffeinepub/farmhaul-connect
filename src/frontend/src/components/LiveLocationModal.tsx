@@ -17,8 +17,12 @@ interface LiveLocationModalProps {
   activeRequests: PickupRequest[];
 }
 
-const BASE_LAT = 1.2921;
-const BASE_LNG = 36.8219;
+interface DriverLocation {
+  lat: number;
+  lng: number;
+  requestId: string;
+  updatedAt: number;
+}
 
 export default function LiveLocationModal({
   open,
@@ -32,26 +36,48 @@ export default function LiveLocationModal({
         r.status === RequestStatus.inProgress),
   );
 
-  const [coords, setCoords] = useState({ lat: BASE_LAT, lng: BASE_LNG });
-  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(
+    null,
+  );
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // Poll localStorage every 5 seconds for driver's real GPS position
   useEffect(() => {
     if (!open || !trackedRequest) return;
-    const interval = setInterval(() => {
-      setCoords((prev) => ({
-        lat: prev.lat + (Math.random() - 0.5) * 0.002,
-        lng: prev.lng + (Math.random() - 0.5) * 0.002,
-      }));
-      setLastUpdated(new Date());
-    }, 5000);
+
+    const requestId = trackedRequest.id.toString();
+
+    const poll = () => {
+      const raw = localStorage.getItem("farmhaul_driver_location");
+      if (!raw) {
+        setDriverLocation(null);
+        return;
+      }
+      try {
+        const entry: DriverLocation = JSON.parse(raw);
+        if (entry.requestId === requestId) {
+          setDriverLocation(entry);
+          setLastUpdated(new Date(entry.updatedAt));
+        } else {
+          setDriverLocation(null);
+        }
+      } catch {
+        setDriverLocation(null);
+      }
+    };
+
+    poll(); // immediate first check
+    const interval = setInterval(poll, 5000);
     return () => clearInterval(interval);
   }, [open, trackedRequest]);
 
-  // Map pin position as percentage based on coordinate drift
-  const pinX = 45 + ((coords.lng - BASE_LNG) / 0.01) * 5;
-  const pinY = 45 - ((coords.lat - BASE_LAT) / 0.01) * 5;
-  const clampedX = Math.max(10, Math.min(85, pinX));
-  const clampedY = Math.max(10, Math.min(85, pinY));
+  // Derive map pin position from real coords
+  const BASE_LAT = driverLocation?.lat ?? 0;
+  const BASE_LNG = driverLocation?.lng ?? 0;
+  // We use a fixed anchor for the map centre and shift the pin relative to it
+  // Since we only show one pin, simply place it at 50/50 when real data exists
+  const pinX = 50;
+  const pinY = 40;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -119,111 +145,135 @@ export default function LiveLocationModal({
                 </Badge>
               </div>
 
-              {/* Map area */}
-              <div className="relative w-full h-52 bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl overflow-hidden border border-green-200">
-                {/* Grid lines */}
-                <svg
-                  aria-hidden="true"
-                  className="absolute inset-0 w-full h-full opacity-20"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <defs>
-                    <pattern
-                      id="grid"
-                      width="24"
-                      height="24"
-                      patternUnits="userSpaceOnUse"
-                    >
-                      <path
-                        d="M 24 0 L 0 0 0 24"
-                        fill="none"
-                        stroke="#16a34a"
-                        strokeWidth="0.5"
-                      />
-                    </pattern>
-                  </defs>
-                  <rect width="100%" height="100%" fill="url(#grid)" />
-                </svg>
-
-                {/* Route line */}
-                <svg
-                  aria-hidden="true"
-                  className="absolute inset-0 w-full h-full"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <line
-                    x1="15%"
-                    y1="80%"
-                    x2={`${clampedX}%`}
-                    y2={`${clampedY}%`}
-                    stroke="#16a34a"
-                    strokeWidth="2"
-                    strokeDasharray="6 3"
-                    opacity="0.5"
-                  />
-                </svg>
-
-                {/* Origin pin */}
-                <div className="absolute bottom-4 left-4 flex flex-col items-center">
-                  <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow" />
-                  <span className="text-[10px] text-blue-700 font-medium mt-0.5">
-                    Origin
-                  </span>
-                </div>
-
-                {/* Transporter pin */}
+              {/* Waiting state — driver hasn't shared yet */}
+              {!driverLocation ? (
                 <div
-                  className="absolute transition-all duration-1000 ease-out flex flex-col items-center"
-                  style={{
-                    left: `${clampedX}%`,
-                    top: `${clampedY}%`,
-                    transform: "translate(-50%, -100%)",
-                  }}
+                  className="flex flex-col items-center justify-center h-52 bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl border border-green-200 gap-3"
+                  data-ocid="live_location.loading_state"
                 >
-                  <div className="relative">
-                    <div className="absolute -inset-2 rounded-full bg-brand-green/30 animate-ping" />
-                    <div className="relative w-8 h-8 rounded-full bg-brand-green border-2 border-white shadow-lg flex items-center justify-center">
-                      <Navigation className="w-4 h-4 text-white fill-white" />
+                  <div className="w-12 h-12 rounded-full bg-brand-green/10 flex items-center justify-center">
+                    <Navigation className="w-6 h-6 text-brand-green animate-pulse" />
+                  </div>
+                  <p className="text-sm font-medium text-brand-dark">
+                    Waiting for driver's location…
+                  </p>
+                  <p className="text-xs text-muted-foreground text-center px-4">
+                    The driver's position will appear here once they start
+                    sharing their GPS.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Map area */}
+                  <div className="relative w-full h-52 bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl overflow-hidden border border-green-200">
+                    {/* Grid lines */}
+                    <svg
+                      aria-hidden="true"
+                      className="absolute inset-0 w-full h-full opacity-20"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <defs>
+                        <pattern
+                          id="grid"
+                          width="24"
+                          height="24"
+                          patternUnits="userSpaceOnUse"
+                        >
+                          <path
+                            d="M 24 0 L 0 0 0 24"
+                            fill="none"
+                            stroke="#16a34a"
+                            strokeWidth="0.5"
+                          />
+                        </pattern>
+                      </defs>
+                      <rect width="100%" height="100%" fill="url(#grid)" />
+                    </svg>
+
+                    {/* Route line */}
+                    <svg
+                      aria-hidden="true"
+                      className="absolute inset-0 w-full h-full"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <line
+                        x1="15%"
+                        y1="80%"
+                        x2={`${pinX}%`}
+                        y2={`${pinY}%`}
+                        stroke="#16a34a"
+                        strokeWidth="2"
+                        strokeDasharray="6 3"
+                        opacity="0.5"
+                      />
+                    </svg>
+
+                    {/* Origin pin */}
+                    <div className="absolute bottom-4 left-4 flex flex-col items-center">
+                      <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow" />
+                      <span className="text-[10px] text-blue-700 font-medium mt-0.5">
+                        Origin
+                      </span>
+                    </div>
+
+                    {/* Driver pin */}
+                    <div
+                      className="absolute transition-all duration-1000 ease-out flex flex-col items-center"
+                      style={{
+                        left: `${pinX}%`,
+                        top: `${pinY}%`,
+                        transform: "translate(-50%, -100%)",
+                      }}
+                    >
+                      <div className="relative">
+                        <div className="absolute -inset-2 rounded-full bg-brand-green/30 animate-ping" />
+                        <div className="relative w-8 h-8 rounded-full bg-brand-green border-2 border-white shadow-lg flex items-center justify-center">
+                          <Navigation className="w-4 h-4 text-white fill-white" />
+                        </div>
+                      </div>
+                      <div className="mt-1 bg-white/90 backdrop-blur-sm text-[10px] font-semibold text-brand-dark px-2 py-0.5 rounded-full shadow">
+                        Driver
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-1 bg-white/90 backdrop-blur-sm text-[10px] font-semibold text-brand-dark px-2 py-0.5 rounded-full shadow">
-                    Transporter
+
+                  {/* Coordinates */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-muted rounded-xl p-3 text-center">
+                      <p className="text-xs text-muted-foreground mb-0.5">
+                        Latitude
+                      </p>
+                      <p className="font-mono text-sm font-semibold text-brand-dark">
+                        {BASE_LAT.toFixed(5)}
+                      </p>
+                    </div>
+                    <div className="bg-muted rounded-xl p-3 text-center">
+                      <p className="text-xs text-muted-foreground mb-0.5">
+                        Longitude
+                      </p>
+                      <p className="font-mono text-sm font-semibold text-brand-dark">
+                        {BASE_LNG.toFixed(5)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Coordinates */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted rounded-xl p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-0.5">
-                    Latitude
-                  </p>
-                  <p className="font-mono text-sm font-semibold text-brand-dark">
-                    {coords.lat.toFixed(5)}
-                  </p>
-                </div>
-                <div className="bg-muted rounded-xl p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-0.5">
-                    Longitude
-                  </p>
-                  <p className="font-mono text-sm font-semibold text-brand-dark">
-                    {coords.lng.toFixed(5)}
-                  </p>
-                </div>
-              </div>
+                  {/* Last updated */}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse inline-block" />
+                      Live tracking active
+                    </span>
+                    <span>
+                      Updated{" "}
+                      {lastUpdated ? lastUpdated.toLocaleTimeString() : "—"}
+                    </span>
+                  </div>
 
-              {/* Last updated */}
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse inline-block" />
-                  Live tracking active
-                </span>
-                <span>Updated {lastUpdated.toLocaleTimeString()}</span>
-              </div>
-
-              <p className="text-xs text-muted-foreground text-center">
-                Location updates every 5 seconds
-              </p>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Location updates every 5 seconds
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>

@@ -8,6 +8,7 @@ import {
   Leaf,
   Loader2,
   LogOut,
+  MapPin,
   MessageCircle,
   Package,
   Phone,
@@ -56,6 +57,7 @@ export default function TransporterDashboard({
   } | null>(null);
   const [callPickerRequest, setCallPickerRequest] =
     useState<PickupRequest | null>(null);
+  const [isSharingLocation, setIsSharingLocation] = useState(false);
 
   const [vehicleType, setVehicleType] = useState("");
   const [vehicleCapacity, setVehicleCapacity] = useState("");
@@ -71,6 +73,53 @@ export default function TransporterDashboard({
   const deliveredTrips = (trips ?? []).filter(
     (r) => r.status === RequestStatus.delivered,
   );
+
+  // GPS location sharing — write driver position to localStorage for farmer to read
+  useEffect(() => {
+    if (activeTrips.length === 0) {
+      setIsSharingLocation(false);
+      localStorage.removeItem("farmhaul_driver_location");
+      return;
+    }
+
+    const firstTrip = activeTrips[0];
+    const requestId = firstTrip.id.toString();
+
+    if (!navigator.geolocation) {
+      console.warn("Geolocation is not supported by this browser.");
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const entry = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          requestId,
+          updatedAt: Date.now(),
+        };
+        localStorage.setItem("farmhaul_driver_location", JSON.stringify(entry));
+        setIsSharingLocation(true);
+      },
+      (error) => {
+        console.warn("Geolocation error:", error.message);
+        if (error.code === error.PERMISSION_DENIED) {
+          toast.error(
+            "Location permission denied. Farmer cannot see your live location.",
+          );
+        }
+        setIsSharingLocation(false);
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 },
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      localStorage.removeItem("farmhaul_driver_location");
+      setIsSharingLocation(false);
+    };
+    // biome-ignore lint/correctness/useExhaustiveDependencies: watch restarts only when trip count changes
+  }, [activeTrips]);
 
   const handleAccept = async (id: bigint) => {
     try {
@@ -119,6 +168,13 @@ export default function TransporterDashboard({
             </span>
           </div>
           <div className="flex items-center gap-3">
+            {isSharingLocation && (
+              <div className="flex items-center gap-1.5 text-xs font-medium text-brand-green bg-brand-green/10 px-2.5 py-1 rounded-full">
+                <MapPin className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Sharing location</span>
+                <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
+              </div>
+            )}
             <div className="hidden sm:block text-sm text-muted-foreground">
               <span className="font-medium text-foreground">
                 {profile.name}
@@ -165,6 +221,9 @@ export default function TransporterDashboard({
               className="rounded-lg gap-2 data-[state=active]:bg-brand-green data-[state=active]:text-white"
             >
               <Truck className="w-4 h-4" /> {t("transporter.tab.trips")}
+              {isSharingLocation && (
+                <span className="w-2 h-2 rounded-full bg-brand-green ml-0.5" />
+              )}
             </TabsTrigger>
             <TabsTrigger
               value="history"
