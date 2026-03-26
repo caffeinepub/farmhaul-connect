@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { UserRole } from "../backend.d";
+import type { Message, UserRole } from "../backend.d";
 import type { PickupRequest, UserProfile } from "../backend.d";
 import { useActor } from "./useActor";
 
@@ -157,6 +157,38 @@ export function useCancelRequest() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["myRequests"] });
+    },
+  });
+}
+
+export function useGetMessages(requestId: bigint | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Message[]>({
+    queryKey: ["messages", requestId?.toString()],
+    queryFn: async () => {
+      if (!actor || requestId === null) return [];
+      return actor.getMessagesByRequest(requestId);
+    },
+    enabled: !!actor && !isFetching && requestId !== null,
+    refetchInterval: 4000,
+  });
+}
+
+export function useSendMessage() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      requestId,
+      text,
+    }: { requestId: bigint; text: string }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.sendMessage(requestId, text);
+    },
+    onSuccess: (_, { requestId }) => {
+      queryClient.invalidateQueries({
+        queryKey: ["messages", requestId.toString()],
+      });
     },
   });
 }

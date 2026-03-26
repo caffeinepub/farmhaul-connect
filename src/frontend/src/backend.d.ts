@@ -23,6 +23,14 @@ export interface PickupRequest {
     farmerName: string;
     pickupLocation: string;
 }
+export interface Message {
+    id: bigint;
+    requestId: bigint;
+    text: string;
+    fromPrincipal: Principal;
+    timestamp: bigint;
+    fromName: string;
+}
 export interface UserProfile {
     userRole: UserRole;
     name: string;
@@ -50,6 +58,7 @@ export interface backendInterface {
     getAvailableRequests(): Promise<Array<PickupRequest>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getMessagesByRequest(requestId: bigint): Promise<Array<Message>>;
     getMyRequests(): Promise<Array<PickupRequest>>;
     getMyTrips(): Promise<Array<PickupRequest>>;
     getRequestById(id: bigint): Promise<PickupRequest | null>;
@@ -57,5 +66,6 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     register(name: string, phone: string, role: UserRole): Promise<UserProfile>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    sendMessage(requestId: bigint, text: string): Promise<void>;
     startDelivery(requestId: bigint): Promise<void>;
 }

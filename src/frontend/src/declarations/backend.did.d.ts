@@ -10,6 +10,14 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface Message {
+  'id' : bigint,
+  'requestId' : bigint,
+  'text' : string,
+  'fromPrincipal' : Principal,
+  'timestamp' : bigint,
+  'fromName' : string,
+}
 export interface PickupRequest {
   'id' : bigint,
   'status' : RequestStatus,
@@ -53,6 +61,7 @@ export interface _SERVICE {
   'getAvailableRequests' : ActorMethod<[], Array<PickupRequest>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getMessagesByRequest' : ActorMethod<[bigint], Array<Message>>,
   'getMyRequests' : ActorMethod<[], Array<PickupRequest>>,
   'getMyTrips' : ActorMethod<[], Array<PickupRequest>>,
   'getRequestById' : ActorMethod<[bigint], [] | [PickupRequest]>,
@@ -60,6 +69,7 @@ export interface _SERVICE {
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'register' : ActorMethod<[string, string, UserRole], UserProfile>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'sendMessage' : ActorMethod<[bigint, string], undefined>,
   'startDelivery' : ActorMethod<[bigint], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;

@@ -1,30 +1,35 @@
 # FarmHaul Connect
 
 ## Current State
-Full-stack app with Farmer and Transporter dashboards. All UI text is hardcoded in English across LandingPage, RegisterPage, FarmerDashboard, TransporterDashboard, RequestCard, and FarmerVoiceAssistant.
+The app has Farmer and Transporter dashboards with pickup request management. Each PickupRequest has a farmerId and optional transporterId. There is no messaging between users. The backend has user profiles, pickup requests, and authorization. The frontend uses React + Tailwind + lucide-react + shadcn.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Language context (`LanguageContext`) that stores current language and provides a `t()` translation function
-- Translation file (`i18n/translations.ts`) with all UI strings in English, Kannada (ಕನ್ನಡ), and Hindi (हिन्दी)
-- Language switcher UI: a dropdown/toggle with 3 options — English, ಕನ್ನಡ, हिन्दी — placed in the header of LandingPage, FarmerDashboard, and TransporterDashboard. Also visible on RegisterPage.
-- Language preference persisted in localStorage
+- Backend: Message type with fields (id, fromPrincipal, fromName, requestId, text, timestamp)
+- Backend: `sendMessage(requestId: Nat, text: Text)` — stores a message tied to a pickup request
+- Backend: `getMessagesByRequest(requestId: Nat)` — returns all messages for a request (query)
+- Frontend: A "Message" button on each RequestCard (shown when a transporter is assigned or from the transporter side)
+- Frontend: MessagingPanel component — a drawer/sheet that opens showing message history for a request
+  - Scrollable message bubbles (self = right/green, other = left/muted)
+  - Text input with send button
+  - Mic button for voice-to-text (SpeechRecognition) that auto-sends on result
+  - Polls for new messages every 4 seconds while open
+- Frontend: Messaging button visible on RequestCards in both Farmer active requests and Transporter trips tabs (only when transporter is assigned)
 
 ### Modify
-- LandingPage: replace all hardcoded strings with `t()` calls
-- RegisterPage: replace all hardcoded strings with `t()` calls
-- FarmerDashboard: replace all hardcoded strings with `t()` calls
-- TransporterDashboard: replace all hardcoded strings with `t()` calls
-- RequestCard: replace all hardcoded strings with `t()` calls
-- App.tsx: wrap app in `LanguageProvider`
+- RequestCard.tsx: accept optional `onMessage` prop to render a Message button
+- FarmerDashboard.tsx: pass `onMessage` handler to RequestCards in active requests tab
+- TransporterDashboard.tsx: pass `onMessage` handler to RequestCards in trips tab
 
 ### Remove
-- Nothing removed
+- Nothing
 
 ## Implementation Plan
-1. Create `src/frontend/src/i18n/translations.ts` with full translation strings for en, kn (Kannada), hi (Hindi)
-2. Create `src/frontend/src/contexts/LanguageContext.tsx` with provider and `useLanguage` hook
-3. Create `src/frontend/src/components/LanguageSwitcher.tsx` dropdown component
-4. Update App.tsx to wrap with LanguageProvider
-5. Update LandingPage, RegisterPage, FarmerDashboard, TransporterDashboard, RequestCard with translations
+1. Update backend main.mo: add Message type, messages map, nextMessageId, sendMessage, getMessagesByRequest
+2. Regenerate bindings (handled automatically)
+3. Create `src/frontend/src/components/MessagingPanel.tsx` — drawer-based messaging UI
+4. Update `src/frontend/src/components/RequestCard.tsx` — add optional onMessage prop
+5. Update `src/frontend/src/pages/FarmerDashboard.tsx` — open MessagingPanel from active requests
+6. Update `src/frontend/src/pages/TransporterDashboard.tsx` — open MessagingPanel from trips
+7. Update `src/frontend/src/hooks/useQueries.ts` — add useSendMessage and useGetMessages hooks

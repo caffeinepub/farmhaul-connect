@@ -11,15 +11,17 @@ import {
   Leaf,
   Loader2,
   LogOut,
+  MessageCircle,
   Plus,
   Wheat,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { UserProfile } from "../backend.d";
+import type { PickupRequest, UserProfile } from "../backend.d";
 import { RequestStatus } from "../backend.d";
 import FarmerVoiceAssistant from "../components/FarmerVoiceAssistant";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import MessagingPanel from "../components/MessagingPanel";
 import RequestCard from "../components/RequestCard";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -30,11 +32,13 @@ import {
 } from "../hooks/useQueries";
 
 export default function FarmerDashboard({ profile }: { profile: UserProfile }) {
-  const { clear } = useInternetIdentity();
+  const { clear, identity } = useInternetIdentity();
   const { data: requests, isLoading } = useMyRequests();
   const createRequest = useCreateRequest();
   const cancelRequest = useCancelRequest();
   const { t } = useLanguage();
+  const [messagingRequest, setMessagingRequest] =
+    useState<PickupRequest | null>(null);
 
   const [form, setForm] = useState({
     cropType: "",
@@ -261,7 +265,7 @@ export default function FarmerDashboard({ profile }: { profile: UserProfile }) {
                   type="submit"
                   className="w-full rounded-pill bg-brand-green text-white hover:opacity-90"
                   disabled={createRequest.isPending}
-                  data-ocid="request.submit.button"
+                  data-ocid="request.submit_button"
                 >
                   {createRequest.isPending ? (
                     <>
@@ -305,18 +309,32 @@ export default function FarmerDashboard({ profile }: { profile: UserProfile }) {
                     request={req}
                     index={i + 1}
                     actions={
-                      req.status === RequestStatus.pending ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-pill border-destructive text-destructive hover:bg-destructive hover:text-white"
-                          onClick={() => handleCancel(req.id)}
-                          disabled={cancelRequest.isPending}
-                          data-ocid={`request.delete_button.${i + 1}`}
-                        >
-                          {t("farmer.cancel")}
-                        </Button>
-                      ) : null
+                      <>
+                        {req.transporterId && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-pill border-brand-green text-brand-green hover:bg-brand-green hover:text-white gap-1.5"
+                            onClick={() => setMessagingRequest(req)}
+                            data-ocid={`request.open_modal_button.${i + 1}`}
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            Message
+                          </Button>
+                        )}
+                        {req.status === RequestStatus.pending && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-pill border-destructive text-destructive hover:bg-destructive hover:text-white"
+                            onClick={() => handleCancel(req.id)}
+                            disabled={cancelRequest.isPending}
+                            data-ocid={`request.delete_button.${i + 1}`}
+                          >
+                            {t("farmer.cancel")}
+                          </Button>
+                        )}
+                      </>
                     }
                   />
                 ))}
@@ -376,6 +394,16 @@ export default function FarmerDashboard({ profile }: { profile: UserProfile }) {
           caffeine.ai
         </a>
       </footer>
+
+      {messagingRequest && (
+        <MessagingPanel
+          open={!!messagingRequest}
+          onClose={() => setMessagingRequest(null)}
+          request={messagingRequest}
+          currentUserPrincipal={identity?.getPrincipal().toString() ?? ""}
+          currentUserName={profile.name}
+        />
+      )}
     </div>
   );
 }

@@ -105,6 +105,14 @@ export interface PickupRequest {
     farmerName: string;
     pickupLocation: string;
 }
+export interface Message {
+    id: bigint;
+    requestId: bigint;
+    text: string;
+    fromPrincipal: Principal;
+    timestamp: bigint;
+    fromName: string;
+}
 export interface UserProfile {
     userRole: UserRole;
     name: string;
@@ -133,6 +141,7 @@ export interface backendInterface {
     getAvailableRequests(): Promise<Array<PickupRequest>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getMessagesByRequest(requestId: bigint): Promise<Array<Message>>;
     getMyRequests(): Promise<Array<PickupRequest>>;
     getMyTrips(): Promise<Array<PickupRequest>>;
     getRequestById(id: bigint): Promise<PickupRequest | null>;
@@ -140,6 +149,7 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     register(name: string, phone: string, role: UserRole): Promise<UserProfile>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    sendMessage(requestId: bigint, text: string): Promise<void>;
     startDelivery(requestId: bigint): Promise<void>;
 }
 import type { PickupRequest as _PickupRequest, RequestStatus as _RequestStatus, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
@@ -285,6 +295,20 @@ export class Backend implements backendInterface {
             return from_candid_UserRole_n13(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getMessagesByRequest(arg0: bigint): Promise<Array<Message>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMessagesByRequest(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMessagesByRequest(arg0);
+            return result;
+        }
+    }
     async getMyRequests(): Promise<Array<PickupRequest>> {
         if (this.processError) {
             try {
@@ -380,6 +404,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n16(this._uploadFile, this._downloadFile, arg0));
+            return result;
+        }
+    }
+    async sendMessage(arg0: bigint, arg1: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.sendMessage(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.sendMessage(arg0, arg1);
             return result;
         }
     }

@@ -41,6 +41,14 @@ export const UserProfile = IDL.Record({
   'name' : IDL.Text,
   'phone' : IDL.Text,
 });
+export const Message = IDL.Record({
+  'id' : IDL.Nat,
+  'requestId' : IDL.Nat,
+  'text' : IDL.Text,
+  'fromPrincipal' : IDL.Principal,
+  'timestamp' : IDL.Int,
+  'fromName' : IDL.Text,
+});
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
@@ -57,6 +65,7 @@ export const idlService = IDL.Service({
   'getAvailableRequests' : IDL.Func([], [IDL.Vec(PickupRequest)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getMessagesByRequest' : IDL.Func([IDL.Nat], [IDL.Vec(Message)], ['query']),
   'getMyRequests' : IDL.Func([], [IDL.Vec(PickupRequest)], ['query']),
   'getMyTrips' : IDL.Func([], [IDL.Vec(PickupRequest)], ['query']),
   'getRequestById' : IDL.Func([IDL.Nat], [IDL.Opt(PickupRequest)], ['query']),
@@ -68,6 +77,7 @@ export const idlService = IDL.Service({
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'register' : IDL.Func([IDL.Text, IDL.Text, UserRole], [UserProfile], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'sendMessage' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'startDelivery' : IDL.Func([IDL.Nat], [], []),
 });
 
@@ -107,6 +117,14 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Text,
     'phone' : IDL.Text,
   });
+  const Message = IDL.Record({
+    'id' : IDL.Nat,
+    'requestId' : IDL.Nat,
+    'text' : IDL.Text,
+    'fromPrincipal' : IDL.Principal,
+    'timestamp' : IDL.Int,
+    'fromName' : IDL.Text,
+  });
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
@@ -123,6 +141,7 @@ export const idlFactory = ({ IDL }) => {
     'getAvailableRequests' : IDL.Func([], [IDL.Vec(PickupRequest)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getMessagesByRequest' : IDL.Func([IDL.Nat], [IDL.Vec(Message)], ['query']),
     'getMyRequests' : IDL.Func([], [IDL.Vec(PickupRequest)], ['query']),
     'getMyTrips' : IDL.Func([], [IDL.Vec(PickupRequest)], ['query']),
     'getRequestById' : IDL.Func([IDL.Nat], [IDL.Opt(PickupRequest)], ['query']),
@@ -134,6 +153,7 @@ export const idlFactory = ({ IDL }) => {
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'register' : IDL.Func([IDL.Text, IDL.Text, UserRole], [UserProfile], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'sendMessage' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'startDelivery' : IDL.Func([IDL.Nat], [], []),
   });
 };

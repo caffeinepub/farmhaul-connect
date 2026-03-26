@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { Leaf, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import ChatBot from "./components/ChatBot";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { useActor } from "./hooks/useActor";
 import { useInternetIdentity } from "./hooks/useInternetIdentity";
@@ -97,6 +98,7 @@ export default function App() {
   return (
     <LanguageProvider>
       <AppInner />
+      <ChatBot />
     </LanguageProvider>
   );
 }

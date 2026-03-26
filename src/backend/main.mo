@@ -9,10 +9,13 @@ import Runtime "mo:core/Runtime";
 import Iter "mo:core/Iter";
 import Int "mo:core/Int";
 import Array "mo:core/Array";
+import Migration "migration";
 
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 
+// Apply migration using with-clauses
+(with migration = Migration.run)
 actor {
   // Types
   type UserRole = AccessControl.UserRole;
@@ -48,6 +51,15 @@ actor {
     updatedAt : Int;
   };
 
+  type Message = {
+    id : Nat;
+    fromPrincipal : Principal;
+    fromName : Text;
+    requestId : Nat;
+    text : Text;
+    timestamp : Int;
+  };
+
   module PickupRequest {
     public func compare(req1 : PickupRequest, req2 : PickupRequest) : Order.Order {
       Nat.compare(req1.id, req2.id);
@@ -60,16 +72,28 @@ actor {
     };
   };
 
+  module Message {
+    public func compare(msg1 : Message, msg2 : Message) : Order.Order {
+      Nat.compare(msg1.id, msg2.id);
+    };
+  };
+
   // State
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
   let userProfiles = Map.empty<Principal, UserProfile>();
   let pickupRequests = Map.empty<Nat, PickupRequest>();
+  let messages = Map.empty<Nat, Message>();
+
   var nextRequestId = 1;
+  var nextMessageId = 1;
 
   // Profile management
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view profiles");
+    };
     userProfiles.get(caller);
   };
 
@@ -287,7 +311,7 @@ actor {
 
   // Custom registration with phone number
   public shared ({ caller }) func register(name : Text, phone : Text, role : UserRole) : async UserProfile {
-    if (role == #admin and not AccessControl.isAdmin(accessControlState, caller)) {
+    if (role == #admin and not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("You are not authorized to register as admin");
     };
     let profile : UserProfile = {
@@ -304,5 +328,69 @@ actor {
       Runtime.trap("Unauthorized: Only users can save profiles");
     };
     userProfiles.add(caller, profile);
+  };
+
+  // Messaging system
+  public shared ({ caller }) func sendMessage(requestId : Nat, text : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can send messages");
+    };
+
+    let user = switch (userProfiles.get(caller)) {
+      case (null) { Runtime.trap("User not found") };
+      case (?profile) { profile };
+    };
+
+    let request = switch (pickupRequests.get(requestId)) {
+      case (null) { Runtime.trap("Request not found") };
+      case (?req) { req };
+    };
+
+    let isFarmer = request.farmerId == caller;
+    let isTransporter = switch (request.transporterId) {
+      case (null) { false };
+      case (?id) { id == caller };
+    };
+
+    if (not (isFarmer or isTransporter)) {
+      Runtime.trap("Unauthorized: Only involved parties can send messages");
+    };
+
+    let id = nextMessageId;
+    nextMessageId += 1;
+
+    let message : Message = {
+      id;
+      fromPrincipal = caller;
+      fromName = user.name;
+      requestId;
+      text;
+      timestamp = Time.now();
+    };
+
+    messages.add(id, message);
+  };
+
+  public query ({ caller }) func getMessagesByRequest(requestId : Nat) : async [Message] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view messages");
+    };
+
+    let request = switch (pickupRequests.get(requestId)) {
+      case (null) { Runtime.trap("Request not found") };
+      case (?req) { req };
+    };
+
+    let isFarmer = request.farmerId == caller;
+    let isTransporter = switch (request.transporterId) {
+      case (null) { false };
+      case (?id) { id == caller };
+    };
+
+    if (not (isFarmer or isTransporter)) {
+      Runtime.trap("Unauthorized: Only involved parties can view messages");
+    };
+
+    messages.values().toArray().filter(func(m) { m.requestId == requestId }).sort();
   };
 };

@@ -6,14 +6,17 @@ import {
   Leaf,
   Loader2,
   LogOut,
+  MessageCircle,
   Package,
   Search,
   Truck,
 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
-import type { UserProfile } from "../backend.d";
+import type { PickupRequest, UserProfile } from "../backend.d";
 import { RequestStatus } from "../backend.d";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import MessagingPanel from "../components/MessagingPanel";
 import RequestCard from "../components/RequestCard";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -28,7 +31,7 @@ import {
 export default function TransporterDashboard({
   profile,
 }: { profile: UserProfile }) {
-  const { clear } = useInternetIdentity();
+  const { clear, identity } = useInternetIdentity();
   const { data: available, isLoading: loadingAvailable } =
     useAvailableRequests();
   const { data: trips, isLoading: loadingTrips } = useMyTrips();
@@ -36,6 +39,8 @@ export default function TransporterDashboard({
   const startDelivery = useStartDelivery();
   const completeDelivery = useCompleteDelivery();
   const { t } = useLanguage();
+  const [messagingRequest, setMessagingRequest] =
+    useState<PickupRequest | null>(null);
 
   const activeTrips = (trips ?? []).filter((r) =>
     [RequestStatus.accepted, RequestStatus.inProgress].includes(r.status),
@@ -217,6 +222,16 @@ export default function TransporterDashboard({
                     index={i + 1}
                     actions={
                       <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-pill border-brand-green text-brand-green hover:bg-brand-green hover:text-white gap-1.5"
+                          onClick={() => setMessagingRequest(req)}
+                          data-ocid={`trips.open_modal_button.${i + 1}`}
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          Message
+                        </Button>
                         {req.status === RequestStatus.accepted && (
                           <Button
                             size="sm"
@@ -302,6 +317,16 @@ export default function TransporterDashboard({
           caffeine.ai
         </a>
       </footer>
+
+      {messagingRequest && (
+        <MessagingPanel
+          open={!!messagingRequest}
+          onClose={() => setMessagingRequest(null)}
+          request={messagingRequest}
+          currentUserPrincipal={identity?.getPrincipal().toString() ?? ""}
+          currentUserName={profile.name}
+        />
+      )}
     </div>
   );
 }
