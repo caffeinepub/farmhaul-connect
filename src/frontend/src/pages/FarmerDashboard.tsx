@@ -13,7 +13,6 @@ import {
   LogOut,
   MapPin,
   MessageCircle,
-  Phone,
   Plus,
   Wheat,
 } from "lucide-react";
@@ -21,7 +20,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { PickupRequest, UserProfile } from "../backend.d";
 import { RequestStatus } from "../backend.d";
-import CallManager from "../components/CallManager";
 import FarmerVoiceAssistant from "../components/FarmerVoiceAssistant";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import LiveLocationModal from "../components/LiveLocationModal";
@@ -41,13 +39,8 @@ export default function FarmerDashboard({ profile }: { profile: UserProfile }) {
   const createRequest = useCreateRequest();
   const cancelRequest = useCancelRequest();
   const { t } = useLanguage();
+
   const [messagingRequest, setMessagingRequest] =
-    useState<PickupRequest | null>(null);
-  const [callingRequest, setCallingRequest] = useState<{
-    request: PickupRequest;
-    type: "audio" | "video";
-  } | null>(null);
-  const [callPickerRequest, setCallPickerRequest] =
     useState<PickupRequest | null>(null);
   const [showLiveLocation, setShowLiveLocation] = useState(false);
 
@@ -349,28 +342,16 @@ export default function FarmerDashboard({ profile }: { profile: UserProfile }) {
                     actions={
                       <>
                         {req.transporterId && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="rounded-pill border-brand-green text-brand-green hover:bg-brand-green hover:text-white gap-1.5"
-                              onClick={() => setMessagingRequest(req)}
-                              data-ocid={`request.open_modal_button.${i + 1}`}
-                            >
-                              <MessageCircle className="w-3.5 h-3.5" />
-                              Message
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="rounded-pill border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white gap-1.5"
-                              onClick={() => setCallPickerRequest(req)}
-                              data-ocid={`request.secondary_button.${i + 1}`}
-                            >
-                              <Phone className="w-3.5 h-3.5" />
-                              Call
-                            </Button>
-                          </>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-pill border-brand-green text-brand-green hover:bg-brand-green hover:text-white gap-1.5"
+                            onClick={() => setMessagingRequest(req)}
+                            data-ocid={`request.open_modal_button.${i + 1}`}
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            Message
+                          </Button>
                         )}
                         {req.status === RequestStatus.pending && (
                           <Button
@@ -458,75 +439,6 @@ export default function FarmerDashboard({ profile }: { profile: UserProfile }) {
           request={messagingRequest}
           currentUserPrincipal={identity?.getPrincipal().toString() ?? ""}
           currentUserName={profile.name}
-        />
-      )}
-
-      {/* Call type picker */}
-      {callPickerRequest && !callingRequest && (
-        // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary
-        <div
-          className="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center"
-          onClick={() => setCallPickerRequest(null)}
-          data-ocid="call.dialog"
-        >
-          {/* biome-ignore lint/a11y/useKeyWithClickEvents: inner stop-propagation */}
-          <div
-            className="bg-white rounded-2xl p-6 shadow-xl w-72 flex flex-col gap-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-bold text-brand-dark text-center">
-              Start a Call
-            </h3>
-            <p className="text-sm text-muted-foreground text-center">
-              with {callPickerRequest.transporterName ?? "Transporter"}
-            </p>
-            <Button
-              className="rounded-pill bg-brand-green text-white gap-2"
-              onClick={() => {
-                setCallingRequest({
-                  request: callPickerRequest,
-                  type: "audio",
-                });
-                setCallPickerRequest(null);
-              }}
-              data-ocid="call.primary_button"
-            >
-              <Phone className="w-4 h-4" /> Audio Call
-            </Button>
-            <Button
-              variant="outline"
-              className="rounded-pill border-brand-green text-brand-green gap-2"
-              onClick={() => {
-                setCallingRequest({
-                  request: callPickerRequest,
-                  type: "video",
-                });
-                setCallPickerRequest(null);
-              }}
-              data-ocid="call.secondary_button"
-            >
-              <Phone className="w-4 h-4" /> Video Call
-            </Button>
-            <Button
-              variant="ghost"
-              className="rounded-pill text-muted-foreground"
-              onClick={() => setCallPickerRequest(null)}
-              data-ocid="call.cancel_button"
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {callingRequest && (
-        <CallManager
-          open={!!callingRequest}
-          onClose={() => setCallingRequest(null)}
-          request={callingRequest.request}
-          currentUserPrincipal={identity?.getPrincipal().toString() ?? ""}
-          isInitiator={false}
-          callType={callingRequest.type}
         />
       )}
     </div>

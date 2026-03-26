@@ -53,6 +53,14 @@ export const Message = IDL.Record({
   'timestamp' : IDL.Int,
   'fromName' : IDL.Text,
 });
+export const CallSignal = IDL.Record({
+  'id' : IDL.Nat,
+  'requestId' : IDL.Nat,
+  'fromPrincipal' : IDL.Principal,
+  'signalType' : IDL.Text,
+  'payload' : IDL.Text,
+  'timestamp' : IDL.Int,
+});
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
@@ -70,6 +78,7 @@ export const idlService = IDL.Service({
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getCallerVehicleInfo' : IDL.Func([], [IDL.Opt(VehicleInfo)], ['query']),
+  'getCallSignals' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Vec(CallSignal)], ['query']),
   'getMessagesByRequest' : IDL.Func([IDL.Nat], [IDL.Vec(Message)], ['query']),
   'getMyRequests' : IDL.Func([], [IDL.Vec(PickupRequest)], ['query']),
   'getMyTrips' : IDL.Func([], [IDL.Vec(PickupRequest)], ['query']),
@@ -83,6 +92,7 @@ export const idlService = IDL.Service({
   'register' : IDL.Func([IDL.Text, IDL.Text, UserRole], [UserProfile], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'saveVehicleInfo' : IDL.Func([IDL.Text, IDL.Text], [], []),
+  'sendCallSignal' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text], [IDL.Nat], []),
   'sendMessage' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'startDelivery' : IDL.Func([IDL.Nat], [], []),
 });
@@ -135,6 +145,14 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Int,
     'fromName' : IDL.Text,
   });
+  const CallSignal = IDL.Record({
+    'id' : IDL.Nat,
+    'requestId' : IDL.Nat,
+    'fromPrincipal' : IDL.Principal,
+    'signalType' : IDL.Text,
+    'payload' : IDL.Text,
+    'timestamp' : IDL.Int,
+  });
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
@@ -152,6 +170,7 @@ export const idlFactory = ({ IDL }) => {
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getCallerVehicleInfo' : IDL.Func([], [IDL.Opt(VehicleInfo)], ['query']),
+    'getCallSignals' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Vec(CallSignal)], ['query']),
     'getMessagesByRequest' : IDL.Func([IDL.Nat], [IDL.Vec(Message)], ['query']),
     'getMyRequests' : IDL.Func([], [IDL.Vec(PickupRequest)], ['query']),
     'getMyTrips' : IDL.Func([], [IDL.Vec(PickupRequest)], ['query']),
@@ -165,6 +184,7 @@ export const idlFactory = ({ IDL }) => {
     'register' : IDL.Func([IDL.Text, IDL.Text, UserRole], [UserProfile], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'saveVehicleInfo' : IDL.Func([IDL.Text, IDL.Text], [], []),
+    'sendCallSignal' : IDL.Func([IDL.Nat, IDL.Text, IDL.Text], [IDL.Nat], []),
     'sendMessage' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'startDelivery' : IDL.Func([IDL.Nat], [], []),
   });

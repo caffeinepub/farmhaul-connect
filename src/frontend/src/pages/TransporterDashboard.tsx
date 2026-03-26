@@ -11,7 +11,6 @@ import {
   MapPin,
   MessageCircle,
   Package,
-  Phone,
   Search,
   Truck,
   User,
@@ -20,7 +19,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { PickupRequest, UserProfile } from "../backend.d";
 import { RequestStatus } from "../backend.d";
-import CallManager from "../components/CallManager";
 import LanguageSwitcher from "../components/LanguageSwitcher";
 import MessagingPanel from "../components/MessagingPanel";
 import RequestCard from "../components/RequestCard";
@@ -49,13 +47,8 @@ export default function TransporterDashboard({
   const completeDelivery = useCompleteDelivery();
   const saveVehicleInfo = useSaveVehicleInfo();
   const { t } = useLanguage();
+
   const [messagingRequest, setMessagingRequest] =
-    useState<PickupRequest | null>(null);
-  const [callingRequest, setCallingRequest] = useState<{
-    request: PickupRequest;
-    type: "audio" | "video";
-  } | null>(null);
-  const [callPickerRequest, setCallPickerRequest] =
     useState<PickupRequest | null>(null);
   const [isSharingLocation, setIsSharingLocation] = useState(false);
 
@@ -75,6 +68,7 @@ export default function TransporterDashboard({
   );
 
   // GPS location sharing — write driver position to localStorage for farmer to read
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeTrips[0] is accessed but we only want to restart on count change
   useEffect(() => {
     if (activeTrips.length === 0) {
       setIsSharingLocation(false);
@@ -118,7 +112,6 @@ export default function TransporterDashboard({
       localStorage.removeItem("farmhaul_driver_location");
       setIsSharingLocation(false);
     };
-    // biome-ignore lint/correctness/useExhaustiveDependencies: watch restarts only when trip count changes
   }, [activeTrips]);
 
   const handleAccept = async (id: bigint) => {
@@ -329,16 +322,6 @@ export default function TransporterDashboard({
                           <MessageCircle className="w-3.5 h-3.5" />
                           Message
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="rounded-pill border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white gap-1.5"
-                          onClick={() => setCallPickerRequest(req)}
-                          data-ocid={`trips.secondary_button.${i + 1}`}
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                          Call
-                        </Button>
                         {req.status === RequestStatus.accepted && (
                           <Button
                             size="sm"
@@ -489,75 +472,6 @@ export default function TransporterDashboard({
           request={messagingRequest}
           currentUserPrincipal={identity?.getPrincipal().toString() ?? ""}
           currentUserName={profile.name}
-        />
-      )}
-
-      {/* Call type picker */}
-      {callPickerRequest && !callingRequest && (
-        // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is supplementary
-        <div
-          className="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center"
-          onClick={() => setCallPickerRequest(null)}
-          data-ocid="call.dialog"
-        >
-          {/* biome-ignore lint/a11y/useKeyWithClickEvents: inner stop-propagation */}
-          <div
-            className="bg-white rounded-2xl p-6 shadow-xl w-72 flex flex-col gap-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-bold text-brand-dark text-center">
-              Start a Call
-            </h3>
-            <p className="text-sm text-muted-foreground text-center">
-              with {callPickerRequest.farmerName ?? "Farmer"}
-            </p>
-            <Button
-              className="rounded-pill bg-brand-green text-white gap-2"
-              onClick={() => {
-                setCallingRequest({
-                  request: callPickerRequest,
-                  type: "audio",
-                });
-                setCallPickerRequest(null);
-              }}
-              data-ocid="call.primary_button"
-            >
-              <Phone className="w-4 h-4" /> Audio Call
-            </Button>
-            <Button
-              variant="outline"
-              className="rounded-pill border-brand-green text-brand-green gap-2"
-              onClick={() => {
-                setCallingRequest({
-                  request: callPickerRequest,
-                  type: "video",
-                });
-                setCallPickerRequest(null);
-              }}
-              data-ocid="call.secondary_button"
-            >
-              <Phone className="w-4 h-4" /> Video Call
-            </Button>
-            <Button
-              variant="ghost"
-              className="rounded-pill text-muted-foreground"
-              onClick={() => setCallPickerRequest(null)}
-              data-ocid="call.cancel_button"
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {callingRequest && (
-        <CallManager
-          open={!!callingRequest}
-          onClose={() => setCallingRequest(null)}
-          request={callingRequest.request}
-          currentUserPrincipal={identity?.getPrincipal().toString() ?? ""}
-          isInitiator={true}
-          callType={callingRequest.type}
         />
       )}
     </div>

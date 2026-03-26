@@ -18,6 +18,14 @@ export interface Message {
   'timestamp' : bigint,
   'fromName' : string,
 }
+export interface CallSignal {
+  'id' : bigint,
+  'requestId' : bigint,
+  'fromPrincipal' : Principal,
+  'signalType' : string,
+  'payload' : string,
+  'timestamp' : bigint,
+}
 export interface PickupRequest {
   'id' : bigint,
   'status' : RequestStatus,
@@ -66,6 +74,7 @@ export interface _SERVICE {
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getCallerVehicleInfo' : ActorMethod<[], [] | [VehicleInfo]>,
+  'getCallSignals' : ActorMethod<[bigint, bigint], Array<CallSignal>>,
   'getMessagesByRequest' : ActorMethod<[bigint], Array<Message>>,
   'getMyRequests' : ActorMethod<[], Array<PickupRequest>>,
   'getMyTrips' : ActorMethod<[], Array<PickupRequest>>,
@@ -75,6 +84,7 @@ export interface _SERVICE {
   'register' : ActorMethod<[string, string, UserRole], UserProfile>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'saveVehicleInfo' : ActorMethod<[string, string], undefined>,
+  'sendCallSignal' : ActorMethod<[bigint, string, string], bigint>,
   'sendMessage' : ActorMethod<[bigint, string], undefined>,
   'startDelivery' : ActorMethod<[bigint], undefined>,
 }
