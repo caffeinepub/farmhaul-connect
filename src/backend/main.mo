@@ -1,14 +1,11 @@
 import Map "mo:core/Map";
 import Text "mo:core/Text";
-import List "mo:core/List";
 import Time "mo:core/Time";
 import Nat "mo:core/Nat";
 import Order "mo:core/Order";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
-import Iter "mo:core/Iter";
 import Int "mo:core/Int";
-import Array "mo:core/Array";
 
 
 import AccessControl "authorization/access-control";
@@ -110,15 +107,31 @@ actor {
   var nextMessageId = 1;
   var nextSignalId = 1;
 
+  // Helper: check if caller is an authorized (registered) user.
+  // Checks access control state first; falls back to profile check for legacy users.
+  func isAuthorizedUser(caller : Principal) : Bool {
+    if (caller.isAnonymous()) { return false };
+    switch (accessControlState.userRoles.get(caller)) {
+      case (?role) { role == #user or role == #admin };
+      case (null) {
+        // Fallback for users registered before access-control enrollment was added
+        switch (userProfiles.get(caller)) {
+          case (?_) { true };
+          case (null) { false };
+        };
+      };
+    };
+  };
+
   // Profile management
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized: Only users can view profiles");
     };
     userProfiles.get(caller);
   };
 
-  public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
+  public query func getUserProfile(user : Principal) : async ?UserProfile {
     switch (userProfiles.get(user)) {
       case (null) { Runtime.trap("User not found") };
       case (?profile) { ?profile };
@@ -127,14 +140,14 @@ actor {
 
   // Vehicle info management
   public query ({ caller }) func getCallerVehicleInfo() : async ?VehicleInfo {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized");
     };
     vehicleInfos.get(caller);
   };
 
   public shared ({ caller }) func saveVehicleInfo(vehicleType : Text, vehicleCapacity : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized");
     };
     let info : VehicleInfo = { vehicleType; vehicleCapacity };
@@ -142,7 +155,7 @@ actor {
   };
 
   // Pickup requests
-  public query ({ caller }) func getAvailableRequests() : async [PickupRequest] {
+  public query func getAvailableRequests() : async [PickupRequest] {
     pickupRequests.values().toArray().filter(func(r) { r.status == #pending }).sort();
   };
 
@@ -154,7 +167,7 @@ actor {
     preferredDate : Text,
     notes : Text,
   ) : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized: Only users can create requests");
     };
 
@@ -190,14 +203,14 @@ actor {
   };
 
   public query ({ caller }) func getMyRequests() : async [PickupRequest] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized: Only users can view their requests");
     };
     pickupRequests.values().toArray().filter(func(r) { r.farmerId == caller }).sort();
   };
 
   public query ({ caller }) func getMyTrips() : async [PickupRequest] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized: Only users can view their trips");
     };
     pickupRequests.values().toArray().filter(func(r) {
@@ -208,13 +221,13 @@ actor {
     }).sort();
   };
 
-  public query ({ caller }) func getRequestById(id : Nat) : async ?PickupRequest {
+  public query func getRequestById(id : Nat) : async ?PickupRequest {
     pickupRequests.get(id);
   };
 
   // Transporter actions
   public shared ({ caller }) func acceptRequest(requestId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized: Only users can accept requests");
     };
 
@@ -244,7 +257,7 @@ actor {
   };
 
   public shared ({ caller }) func startDelivery(requestId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized: Only users can start delivery");
     };
 
@@ -278,7 +291,7 @@ actor {
   };
 
   public shared ({ caller }) func completeDelivery(requestId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized: Only users can complete delivery");
     };
 
@@ -312,7 +325,7 @@ actor {
   };
 
   public shared ({ caller }) func cancelRequest(requestId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized: Only users can cancel requests");
     };
 
@@ -357,11 +370,18 @@ actor {
       userRole = role;
     };
     userProfiles.add(caller, profile);
+    // Enroll user in access control so all permission checks work correctly
+    if (not caller.isAnonymous()) {
+      switch (accessControlState.userRoles.get(caller)) {
+        case (null) { accessControlState.userRoles.add(caller, #user) };
+        case (?_) {}; // already assigned, leave as-is
+      };
+    };
     profile;
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized: Only users can save profiles");
     };
     userProfiles.add(caller, profile);
@@ -369,7 +389,7 @@ actor {
 
   // Messaging system
   public shared ({ caller }) func sendMessage(requestId : Nat, text : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized: Only users can send messages");
     };
 
@@ -409,7 +429,7 @@ actor {
   };
 
   public query ({ caller }) func getMessagesByRequest(requestId : Nat) : async [Message] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized: Only users can view messages");
     };
 
@@ -433,7 +453,7 @@ actor {
 
   // WebRTC Signaling
   public shared ({ caller }) func sendCallSignal(requestId : Nat, signalType : Text, payload : Text) : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized");
     };
 
@@ -469,7 +489,7 @@ actor {
   };
 
   public query ({ caller }) func getCallSignals(requestId : Nat, afterId : Nat) : async [CallSignal] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+    if (not isAuthorizedUser(caller)) {
       Runtime.trap("Unauthorized");
     };
 
